@@ -1,58 +1,45 @@
-# Javascript Node CircleCI 2.0 configuration file
+# Java Maven CircleCI 2.0 configuration file
 #
-# Check https://circleci.com/docs/2.0/language-javascript/ for more details
+# Check https://circleci.com/docs/2.0/language-java/ for more details
 #
 version: 2
 jobs:
   build:
-    docker:
-      # specify the version you desire here
-      - image: circleci/node:7.10
-      - image: selenium/standalone-chrome:3.11.0
-      
-      # Specify service dependencies here if necessary  
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/mongo:3.4.4
+    machine: true
 
-    working_directory: ~/repo
-            
+    environment:
+      # Customize the JVM maximum heap limit
+      MAVEN_OPTS: -Xmx3200m
+
     steps:
-      - checkout    
-      - setup_remote_docker
+      - checkout
+
+      - run: |
+         sudo rm -rf .mozilla
+         sudo rm -rf /opt/firefox/*
+         sudo apt-get remove --purge firefox
+         sudo updatedb
+         locate firefox
+         wget https://sourceforge.net/projects/ubuntuzilla/files/mozilla/apt/pool/main/f/firefox-mozilla-build/firefox-mozilla-build_57.0-0ubuntu1_amd64.deb
+         sudo dpkg -i firefox-mozilla-build_57.0-0ubuntu1_amd64.deb
+         sudo unlink /usr/bin/firefox
+         sudo ln -s /opt/firefox/firefox /usr/bin/firefox
+
       # Download and cache dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "package.json" }}
+          - v1-dependencies-{{ checksum "pom.xml" }}
           # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
-     
-      - run: yarn install
+
+      - run: mkdir test-reports
+
+      - run: mvn dependency:go-offline
 
       - save_cache:
           paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-          
-      - run:
-          name: create docker network
-          command: docker network create grid
-     
-      - run:
-          name: install selenium-hub
-          command: docker run -d --rm -p 4444:4444 --net grid --name selenium-hub selenium/hub:3.11.0
-          
-      - run:
-          name: install selenium-node
-          command: docker run -d --rm --net grid -e HUB_HOST=selenium-hub -v /dev/shm:/dev/shm selenium/node-chrome:3.11.0
-      
-      - run:
-          name: install-npm
-          command: npm install
-        
-      # run tests!
-      - run: 
-          name: run tests
-          command: node index.js
-          
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "pom.xml" }}
 
+      # run tests!
+      - run: mvn clean integration-test
